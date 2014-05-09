@@ -30,30 +30,6 @@ public class BooleanExpression extends Expression {
         return Expression.createExpression(Type.BOOLEAN, result);
     }
 
-    public Expression applyEQ(Expression rightOperand) throws Exception {
-        if (rightOperand.type != Type.BOOLEAN) {
-            throw new Exception("Right operand of EQ operation is type " + rightOperand.getType() + ", should be BOOLEAN.");
-        }
-        
-        if (isFormal || rightOperand.isFormal)
-            return Expression.createParameter(Type.BOOLEAN);
-        
-        Boolean result = ((Boolean) value) == ((Boolean) rightOperand.value);
-        return Expression.createExpression(Type.BOOLEAN, result);
-    }
-
-    public Expression applyNE(Expression rightOperand) throws Exception {
-        if (rightOperand.type != Type.BOOLEAN) {
-            throw new Exception("Right operand of NE operation is type " + rightOperand.getType() + ", should be BOOLEAN.");
-        }
-        
-        if (isFormal || rightOperand.isFormal)
-            return Expression.createParameter(Type.BOOLEAN);
-        
-        Boolean result = ((Boolean) value) != ((Boolean) rightOperand.value);
-        return Expression.createExpression(Type.BOOLEAN, result);
-    }
-
     public Expression applyQUES(Expression trueOperand, Expression falseOperand) throws Exception {
         if (trueOperand.type != falseOperand.type) {
             throw new Exception("Both right operands of ternary equation should have same type");
