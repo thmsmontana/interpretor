@@ -7,7 +7,7 @@ public class SymbolTable {
     
     private Map<String, Function> functions;
     
-    private Stack<Map<String, Type>> variables;
+    private Stack<Map<String, Expression>> variables;
     
     public static SymbolTable getInstance() {
         return instance == null ? instance = new SymbolTable() : instance;
@@ -16,7 +16,7 @@ public class SymbolTable {
     private SymbolTable() {
         functions = new HashMap<>();
         variables = new Stack<>();
-        variables.push(new HashMap<String, Type>());
+        variables.push(new HashMap<String, Expression>());
     }
     
     public void declareFunction(String ident, Function func) 
@@ -39,22 +39,22 @@ public class SymbolTable {
     }
     
     public void openNewScope() {
-        variables.push(new HashMap<String, Type>());
+        variables.push(new HashMap<String, Expression>());
     }
     
     public void closeTopScope() {
         variables.pop();
     }
     
-    public void declareSymbol(String ident, Type type) 
+    public void declareSymbol(String ident, Expression expression) 
             throws Exception {
         if (variables.lastElement().containsKey(ident)) {
             throw new Exception("Identifier already in use : symbol <" + ident + ">");
         }
-        variables.lastElement().put(ident, type);
+        variables.lastElement().put(ident, expression);
     }
     
-    public Type getType(String ident) throws Exception {
+    public Expression getExpression(String ident) throws Exception {
         for (int i = variables.size() - 1; i >= 0; i--) {
             if (variables.get(i).containsKey(ident)) {
                 return variables.get(i).get(ident);
