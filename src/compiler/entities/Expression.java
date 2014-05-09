@@ -1,3 +1,5 @@
+package compiler.entities;
+
 public class Expression {
 	protected Type type;
 	protected Object value;
@@ -31,6 +33,11 @@ public class Expression {
 				return new Expression(type, null, isFormal);
 		}
 	}
+
+	public static Expression createExpression(Type type, Object value) {
+		createExpression(type, value, false);
+	}
+
 
 	public Object getValue() {
 		return value;
