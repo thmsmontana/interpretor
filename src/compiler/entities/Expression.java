@@ -21,13 +21,13 @@ public class Expression {
 
 	public static Expression createExpression(Type type, Object value, boolean isFormal) {
 		switch (type) {
-			case Type.BOOLEAN:
+			case BOOLEAN:
 				return new BooleanExpression(type, value, isFormal);
-			case Type.INTEGER:
+			case INTEGER:
 				return new IntegerExpression(type, value, isFormal);
-			case Type.FLOAT:
+			case FLOAT:
 				return new FloatExpression(type, value, isFormal);
-			case Type.STRING:
+			case STRING:
 				return new StringExpression(type, value, isFormal);
 			default:
 				return new Expression(type, null, isFormal);
@@ -116,7 +116,12 @@ public class Expression {
 	public Expression applyQUES(Expression trueOperand, Expression falseOperand) throws Exception {
 		throw new Exception("The condition for a ternary expression should be a boolean.");
 	}
-	public Expression applyEXCL(Expression operand) throws Exception {
+
+	public Expression applyEXCL() throws Exception {
 		throw new Exception("Operation EXCL is not permitted for type " + this.getType() + ".");
+	}
+
+	public Expression applyMINUS() throws Exception {
+		throw new Exception("Unary '-' operator can only operate on int and float.");
 	}
 }}
