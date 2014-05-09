@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<project name="Compiler" default="run" basedir=".">
+    <description>Builds and runs the project Compiler.</description>
+    
+    <!--
+        DECLARATION SECTION
+    -->
+    
+    <property name="cup" location="cup" />
+    <property name="jflex" location="jflex" />
+    
+    <property name="src" location="src" />
+    <property name="java" location="java" />
+    <property name="bin" location="bin" />
+    <property name="lib" location="lib" />
+    <property name="dist" location="dist" />
+    
+    <property environment="env" />
+    
+    <!-- Runtime libraries -->
+    <path id="libraries">
+        <pathelement location="${lib}" />
+        <fileset dir="${lib}">
+            <include name="**/*.jar" />
+            <include name="**/*.zip" />
+        </fileset>
+        <pathelement path="${java.class.path}" />
+    </path>
+    
+    <!-- We use JFlex -->
+    <taskdef name="jflex"
+        classname="JFlex.anttask.JFlexTask"
+        classpath="${jflex}/JFlex.jar"
+    />
+    
+    <!-- We use CUP-11a -->
+    <taskdef name="cup"
+        classname="java_cup.anttask.CUPTask"
+        classpath="${cup}/java-cup-11a.jar"
+    />
+    
+    <!--
+        TARGETS SECTION
+    -->
+    
+    <!-- Targets -->
+    <target name="init">
+        <mkdir dir="${java}" />
+        <mkdir dir="${bin}" />
+        <mkdir dir="${dist}" />
+    </target>
+    
+    <!-- Generate the Parser class from the cup file -->
+    <target name="cup" depends="init">
+        <cup srcfile="${cup}/Parser.cup" destdir="${java}" interface="true" parser="Parser" />
+    </target>
+    
+    <!-- Generate the Scanner class from the jFlex file -->
+    <target name="jflex" depends="init">
+        <jflex file="${jflex}/Scanner.jflex" destdir="${java}" />
+    </target>
+    
+    <!-- Compile from java dir to bin dir -->
+    <target name="compile" depends="cup,jflex">
+        <!-- Copy required java sources -->
+        <copy todir="${java}">
+            <fileset dir="${src}" includes="**/**.java"/>
+        </copy>
+        <!-- Compile all sources in one task -->
+        <javac srcdir="${java}" includeantruntime="false" destdir="${bin}">
+            <classpath refid="libraries" />
+        </javac>
+    </target>
+    
+    <!-- Build jar and copy librairies in dist dir -->
+    <target name="jar" depends="compile">
+        <jar jarfile="${dist}/Compiler.jar" basedir="${bin}">
+            <manifest>
+                <attribute name="Main-Class" value="compiler.Parser" />
+                <!-- CUP runtime is needed for parsing -->
+                <attribute name="Class-Path" value="java-cup-11a-runtime.jar" />
+            </manifest>
+        </jar>
+        
+        <!-- Thrid party libraries can only be found by java -jar if they reside in the same dir -->
+        <copy todir="${dist}">
+            <fileset dir="${lib}" includes="**/**.jar"/>
+        </copy>
+    </target>
+    
+    <!-- Test the parser in a single run -->
+    <target name="test" depends="jar">
+        <java jar="${dist}/Compiler.jar" fork="true">
+            <arg value="input.test" />
+        </java>
+    </target>
+    
+    <!-- Test the parser "by hand" -->
+    <target name="run" depends="jar">
+        <java jar="${dist}/Compiler.jar" fork="true" />
+    </target>
+    
+    <!-- Delete temporary dirs -->
+    <target name="clean">
+        <delete dir="${java}" />
+        <delete dir="${bin}" />
+        <delete dir="${dist}" />
+    </target>
+</project>

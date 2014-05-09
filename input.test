@@ -1,0 +1,16 @@
+function boolean not(boolean b) {
+    if (true)
+        if (true) ;
+        else ;
+    return !b;
+}
+
+main {
+    boolean b;
+    int i = 3;
+    float f = 1.0;
+    
+    while (b = i > f && i == f) {
+        print i;
+    }
+}

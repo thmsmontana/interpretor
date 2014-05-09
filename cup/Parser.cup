@@ -1,0 +1,570 @@
+package compiler;
+
+import java.util.*;
+
+import compiler.entities.*;
+import java_cup.runtime.*;
+
+parser code {:
+    public static Scanner scanner = null;
+    private Type returnType = null;
+    
+    public Type getReturnType() {
+        return returnType;
+    }
+    
+    public void setReturnType(Type type) {
+        returnType = type;
+    }
+    
+    public void syntax_error(Symbol cur_token) {
+        System.out.println("ERROR: Syntax error on line " + scanner.getLine());
+        System.exit(-2);
+    }
+    
+    public static void main(String args[]) throws Exception {
+        SymbolFactory sf = new DefaultSymbolFactory();
+        scanner = (args.length == 0 ?
+            new Scanner(System.in, sf) :
+            new Scanner(new java.io.FileInputStream(args[0]), sf));
+        new Parser(scanner, sf).parse();
+    }
+:}
+
+
+/*******************************************************************************
+ * TOKENS DEFINITION
+ *******************************************************************************/
+
+/* keywords */
+terminal FUNCTION, MAIN, IF, ELSE, FOR, WHILE, RETURN, TRUE, FALSE, VOID, PRINT;
+
+/* primitive types */
+terminal T_BOOL, T_INT, T_FLOAT, T_STRING;
+
+/* calculus operators */
+terminal PLUS, MINUS, TIMES, DIV, MOD, EQUAL, EXCL;
+
+/* comparison operators */
+terminal LT, LE, GT, GE, EQ, NE, OR, AND, QUES;
+
+/* separators */
+terminal LBRACK, RBRACK, LPAR, RPAR, COLON, COMA, SEMI;
+
+/* literals */
+terminal Integer INT;
+terminal Float FLOAT;
+terminal String STRING;
+terminal String IDENT;
+
+
+/*******************************************************************************
+ * GRAMMAR SYMBOLS
+ *******************************************************************************/
+
+non terminal program, parser_init, func_list, func_proto;
+non terminal block, block_init, instr_list, instruction;
+
+non terminal Type declaration, func_type, type;
+non terminal Type init_opt, expr_opt, expression;
+non terminal List<Type> type_list, param_list;
+
+
+/*******************************************************************************
+ * OPERATORS PRIORITY
+ *******************************************************************************/
+
+precedence right EQUAL;
+precedence right QUES, COLON;
+precedence left OR;
+precedence left AND;
+precedence nonassoc EQ, NE;
+precedence nonassoc LT, LE, GT, GE;
+precedence left PLUS, MINUS;
+precedence left TIMES, DIV, MOD;
+precedence left EXCL;
+
+precedence left ELSE; /* necessary to fix shift/reduce conflict on if-else statements */
+
+
+/*******************************************************************************
+ * GRAMMAR RULES
+ *******************************************************************************/
+
+program     ::= parser_init func_list MAIN block
+                {:
+                    System.out.println("Syntax analysis: OK");
+                    System.out.println("Type checking:   OK");
+                    System.out.println("\n" + SymbolTable.getInstance().getFunctions().size() + " declared function(s)");
+                :}
+            ;
+
+parser_init ::= /* empty */
+                {:
+                    SymbolTable.getInstance();
+                    TypeChecker.getInstance();
+                :}
+            ;
+
+/* ### functions definition section ### */
+
+func_list   ::= /* empty */
+            |   func_list func_proto LBRACK instr_list RETURN expr_opt:e SEMI RBRACK
+                {:
+                    if (parser.getReturnType() != e) {
+                        System.out.println("ERROR: Type mismatch on return statement (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    
+                    parser.setReturnType(null);
+                    SymbolTable.getInstance().closeTopScope();
+                :}
+            ;
+
+func_proto  ::= FUNCTION func_type:t IDENT:i LPAR RPAR
+                {:
+                    Function f = new Function(t, i);
+                    try {
+                        SymbolTable.getInstance().declareFunction(i, f);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    parser.setReturnType(t);
+                    SymbolTable.getInstance().openNewScope();
+                :}
+            |   FUNCTION func_type:t IDENT:i LPAR type_list:l RPAR
+                {:
+                    Function f = new Function(t, i, l);
+                    try {
+                        SymbolTable.getInstance().declareFunction(i, f);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    parser.setReturnType(t);
+                :}
+            ;
+
+func_type   ::= type:t
+                {:
+                    RESULT = t;
+                :}
+            |   VOID
+                {:
+                    RESULT = null;
+                :}
+            ;
+
+type_list   ::= block_init type:t IDENT:i
+                {:
+                    try {
+                        SymbolTable.getInstance().declareSymbol(i, t);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    
+                    RESULT = new ArrayList<Type>();
+                    RESULT.add(t);
+                :}
+            |   type_list:l COMA type:t IDENT:i
+                {:
+                    try {
+                        SymbolTable.getInstance().declareSymbol(i, t);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    
+                    RESULT = l;
+                    RESULT.add(t);
+                :}
+            ;
+
+/* ### code definition section ### */
+
+block       ::= block_init LBRACK instr_list RBRACK
+                {:
+                    SymbolTable.getInstance().closeTopScope();
+                :}
+            ;
+
+block_init  ::= /* empty */
+                {:
+                    SymbolTable.getInstance().openNewScope();
+                :}
+            ;
+
+instr_list  ::= /* empty */
+            |   instr_list instruction
+            ;
+
+instruction ::= block
+            |   declaration SEMI
+            |   expr_opt SEMI
+            |   PRINT expression:e SEMI
+                {:
+                    System.out.println("Line " + Parser.scanner.getLine() + ": expression type is " + e);
+                :}
+            |   RETURN expr_opt:e SEMI
+                {:
+                    if (parser.getReturnType() != e) {
+                        System.out.println("ERROR: Type mismatch on return statement (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   IF LPAR expression:c RPAR instruction
+                {:
+                    if (c != Type.BOOLEAN) {
+                        System.out.println("ERROR: if condition should be a boolean expression (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   IF LPAR expression:c RPAR instruction ELSE instruction
+                {:
+                    if (c != Type.BOOLEAN) {
+                        System.out.println("ERROR: if condition should be a boolean expression (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   FOR LPAR declaration SEMI expr_opt:c SEMI expr_opt RPAR instruction
+                {:
+                    if (c != Type.BOOLEAN) {
+                        System.out.println("ERROR: for condition should be a boolean expression (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   WHILE LPAR expression:c RPAR instruction
+                {:
+                    if (c != Type.BOOLEAN) {
+                        System.out.println("ERROR: while condition should be a boolean expression (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            ;
+
+declaration ::= type:t IDENT:i init_opt:e
+                {:
+                    try {
+                        SymbolTable.getInstance().declareSymbol(i, t);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+
+                    if (e != null) {
+                        try {
+                            TypeChecker tc = TypeChecker.getInstance();
+                            tc.checkOperation("=", t, e);
+                        } catch (Exception ex) {
+                            System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                            System.exit(-1);
+                        }
+                    }
+                    RESULT = t;
+                :}
+            |   declaration:t COMA IDENT:i init_opt:e
+                {:
+                    try {
+                        SymbolTable.getInstance().declareSymbol(i, t);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    
+                    if (e != null) {
+                        try {
+                            TypeChecker tc = TypeChecker.getInstance();
+                            tc.checkOperation("=", t, e);
+                        } catch (Exception ex) {
+                            System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                            System.exit(-1);
+                        }
+                    }
+                    RESULT = t;
+                :}
+            ;
+
+type        ::= T_BOOL
+                {:
+                    RESULT = Type.BOOLEAN;
+                :}
+            |   T_INT
+                {:
+                    RESULT = Type.INTEGER;
+                :}
+            |   T_FLOAT
+                {:
+                    RESULT = Type.FLOAT;
+                :}
+            |   T_STRING
+                {:
+                    RESULT = Type.STRING;
+                :}
+            ;
+
+init_opt    ::= /* empty */
+                {:
+                    RESULT = null;
+                :}
+            |   EQUAL expression:e
+                {:
+                    RESULT = e;
+                :}
+            ;
+
+expr_opt    ::= /* empty */
+                {:
+                    RESULT = null;
+                :}
+            |   expression:e
+                {:
+                    RESULT = e;
+                :}
+            ;
+
+expression  ::= IDENT:i init_opt:e
+                {:
+                    Type t = null;
+                    try {
+                        t = SymbolTable.getInstance().getType(i);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    
+                    if (e != null) {
+                        try {
+                            TypeChecker tc = TypeChecker.getInstance();
+                            tc.checkOperation("=", t, e);
+                        } catch (Exception ex) {
+                            System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                            System.exit(-1);
+                        }
+                    }
+                    RESULT = t;
+                :}
+            |   IDENT:i LPAR RPAR
+                {:
+                    try {
+                        Function f = SymbolTable.getInstance().getFunction(i);
+                        RESULT = f.checkParamTypes(new ArrayList<Type>());
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   IDENT:i LPAR param_list:l RPAR
+                {:
+                    try {
+                        Function f = SymbolTable.getInstance().getFunction(i);
+                        RESULT = f.checkParamTypes(l);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   LPAR expression:e RPAR
+                {:
+                    RESULT = e;
+                :}
+            |   EXCL expression:e
+                {:
+                    if (e != Type.BOOLEAN) {
+                        System.out.println("ERROR: '!' operator can only operate on booleans (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    RESULT = Type.BOOLEAN;
+                :}
+            |   expression:e1 OR expression:e2
+                {:
+                    if (e1 != Type.BOOLEAN || e2 != Type.BOOLEAN) {
+                        System.out.println("ERROR: '||' operator can only operate on booleans (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    RESULT = Type.BOOLEAN;
+                :}
+            |   expression:e1 AND expression:e2
+                {:
+                    if (e1 != Type.BOOLEAN || e2 != Type.BOOLEAN) {
+                        System.out.println("ERROR: '||' operator can only operate on booleans (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    RESULT = Type.BOOLEAN;
+                :}
+            |   expression:e1 EQ expression:e2
+                {:
+                    try {
+                        TypeChecker tc = TypeChecker.getInstance();
+                        RESULT = tc.checkOperation(TypeChecker.EQU_COMPARATOR, e1, e2);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   expression:e1 NE expression:e2
+                {:
+                    try {
+                        TypeChecker tc = TypeChecker.getInstance();
+                        RESULT = tc.checkOperation(TypeChecker.EQU_COMPARATOR, e1, e2);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   expression:e1 LT expression:e2
+                {:
+                    try {
+                        TypeChecker tc = TypeChecker.getInstance();
+                        RESULT = tc.checkOperation(TypeChecker.ORDER_COMPARATOR, e1, e2);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   expression:e1 LE expression:e2
+                {:
+                    try {
+                        TypeChecker tc = TypeChecker.getInstance();
+                        RESULT = tc.checkOperation(TypeChecker.ORDER_COMPARATOR, e1, e2);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   expression:e1 GT expression:e2
+                {:
+                    try {
+                        TypeChecker tc = TypeChecker.getInstance();
+                        RESULT = tc.checkOperation(TypeChecker.ORDER_COMPARATOR, e1, e2);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   expression:e1 GE expression:e2
+                {:
+                    try {
+                        TypeChecker tc = TypeChecker.getInstance();
+                        RESULT = tc.checkOperation(TypeChecker.ORDER_COMPARATOR, e1, e2);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   expression:e1 PLUS expression:e2
+                {:
+                    try {
+                        TypeChecker tc = TypeChecker.getInstance();
+                        RESULT = tc.checkOperation("+", e1, e2);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   expression:e1 MINUS expression:e2
+                {:
+                    try {
+                        TypeChecker tc = TypeChecker.getInstance();
+                        RESULT = tc.checkOperation(TypeChecker.CALC_OPERATOR, e1, e2);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   expression:e1 TIMES expression:e2
+                {:
+                    try {
+                        TypeChecker tc = TypeChecker.getInstance();
+                        RESULT = tc.checkOperation(TypeChecker.CALC_OPERATOR, e1, e2);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   expression:e1 DIV expression:e2
+                {:
+                    try {
+                        TypeChecker tc = TypeChecker.getInstance();
+                        RESULT = tc.checkOperation(TypeChecker.CALC_OPERATOR, e1, e2);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   expression:e1 MOD expression:e2
+                {:
+                    try {
+                        TypeChecker tc = TypeChecker.getInstance();
+                        RESULT = tc.checkOperation(TypeChecker.CALC_OPERATOR, e1, e2);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   MINUS expression:e
+                {:
+                    if (e != Type.INTEGER && e != Type.FLOAT) {
+                        System.out.println("ERROR: Unary '-' operator can only operate on int and float (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    RESULT = e;
+                :} %prec EXCL
+            |   expression:c QUES expression:ei COLON expression:ee
+                {:
+                    if (c != Type.BOOLEAN) {
+                        System.out.println("ERROR: condition of ternary equation should be a boolean expression (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    if (ei != ee) {
+                        System.out.println("ERROR: Type mismatch on ternary equation (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                    RESULT = ei;
+                :}
+            |   TRUE
+                {:
+                    RESULT = Type.BOOLEAN;
+                :}
+            |   FALSE
+                {:
+                    RESULT = Type.BOOLEAN;
+                :}
+            |   INT
+                {:
+                    RESULT = Type.INTEGER;
+                :}
+            |   FLOAT
+                {:
+                    RESULT = Type.FLOAT;
+                :}
+            |   STRING
+                {:
+                    RESULT = Type.STRING;
+                :}
+            ;
+
+param_list  ::= IDENT:i
+                {:
+                    try {
+                        Type t = SymbolTable.getInstance().getType(i);
+                        RESULT = new ArrayList<Type>();
+                        RESULT.add(t);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            |   param_list:l COMA IDENT:i
+                {:
+                    try {
+                        Type t = SymbolTable.getInstance().getType(i);
+                        RESULT = l;
+                        RESULT.add(t);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);
+                    }
+                :}
+            ;
