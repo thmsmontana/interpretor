@@ -8,17 +8,8 @@ import java_cup.runtime.*;
 parser code {:
     public static Scanner scanner = null;
 
-    private boolean inMain = false;
     private Type returnType = null;
     
-    public boolean isInMain() {
-        return inMain;
-    }
-
-    public void setInMain(boolean inMain) {
-        this.inMain = inMain;
-    }
-
     public Type getReturnType() {
         return returnType;
     }
@@ -72,7 +63,7 @@ terminal String IDENT;
  * GRAMMAR SYMBOLS
  *******************************************************************************/
 
-non terminal program, parser_init, func_list, func_proto, main;
+non terminal program, parser_init, func_list, func_proto;
 non terminal block, block_init, instr_list, instruction;
 
 non terminal Expression declaration, func_type, type;
@@ -101,7 +92,7 @@ precedence left ELSE; /* necessary to fix shift/reduce conflict on if-else state
  * GRAMMAR RULES
  *******************************************************************************/
 
-program     ::= parser_init func_list main block
+program     ::= parser_init func_list MAIN block
                 {:
                     System.out.println("Syntax analysis: OK");
                     System.out.println("Type checking:   OK");
@@ -193,12 +184,6 @@ type_list   ::= block_init type:t IDENT:i
             ;
 
 /* ### code definition section ### */
-
-main        ::= MAIN
-                {:
-                    parser.setInMain(true);
-                :}
-            ;
 
 block       ::= block_init LBRACK instr_list RBRACK
                 {:
