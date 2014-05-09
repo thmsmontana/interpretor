@@ -1,78 +1,71 @@
 package compiler.entities;
 
 public class BooleanExpression extends Expression {
+
     protected BooleanExpression(Type type, Object value, boolean isFormal) {
         super(type, value, isFormal);
     }
-    
-	/* Defining operations */
-	public Expression applyEQUAL(Expression rightOperand) throws Exception {
-		if (this.getType() != rightOperand.getType()) {
-			throw new Exception("Could not cast " + rightOperand.getType() + " into " this.getType() + ".");
-		}
-		
-		if (!this.isFormal && !rightOperand.isFormal) {
-			this.value = rightOperand.getValue();
-		}
-		return new Expression(type, value, isFormal);
-	}
 
-	public Expression applyOR(Expression rightOperand) throws Exception {
-		throw new Exception("Operation OR is not permitted for type " + this.getType() + ".");
-	}
+    public Expression applyOR(Expression rightOperand) throws Exception {
+        if (rightOperand.type != Type.BOOLEAN) {
+            throw new Exception("Right operand of OR operation is type " + rightOperand.getType() + ", should be BOOLEAN.");
+        }
+        
+        if (isFormal || rightOperand.isFormal)
+            return Expression.createParameter(Type.BOOLEAN);
+        
+        Boolean result = ((Boolean) value) || ((Boolean) rightOperand.value);
+        return Expression.createExpression(Type.BOOLEAN, result);
+    }
 
-	public Expression applyAND(Expression rightOperand) throws Exception {
-		throw new Exception("Operation AND is not permitted for type " + this.getType() + ".");
-	}
+    public Expression applyAND(Expression rightOperand) throws Exception {
+        if (rightOperand.type != Type.BOOLEAN) {
+            throw new Exception("Right operand of AND operation is type " + rightOperand.getType() + ", should be BOOLEAN.");
+        }
+        
+        if (isFormal || rightOperand.isFormal)
+            return Expression.createParameter(Type.BOOLEAN);
+        
+        Boolean result = ((Boolean) value) && ((Boolean) rightOperand.value);
+        return Expression.createExpression(Type.BOOLEAN, result);
+    }
 
-	public Expression applyEQ(Expression rightOperand) throws Exception {
-		throw new Exception("Operation EQ is not permitted for type " + this.getType() + ".");
-	}
+    public Expression applyEQ(Expression rightOperand) throws Exception {
+        if (rightOperand.type != Type.BOOLEAN) {
+            throw new Exception("Right operand of EQ operation is type " + rightOperand.getType() + ", should be BOOLEAN.");
+        }
+        
+        if (isFormal || rightOperand.isFormal)
+            return Expression.createParameter(Type.BOOLEAN);
+        
+        Boolean result = ((Boolean) value) == ((Boolean) rightOperand.value);
+        return Expression.createExpression(Type.BOOLEAN, result);
+    }
 
-	public Expression applyNE(Expression rightOperand) throws Exception {
-		throw new Exception("Operation NE is not permitted for type " + this.getType() + ".");
-	}
+    public Expression applyNE(Expression rightOperand) throws Exception {
+        if (rightOperand.type != Type.BOOLEAN) {
+            throw new Exception("Right operand of NE operation is type " + rightOperand.getType() + ", should be BOOLEAN.");
+        }
+        
+        if (isFormal || rightOperand.isFormal)
+            return Expression.createParameter(Type.BOOLEAN);
+        
+        Boolean result = ((Boolean) value) != ((Boolean) rightOperand.value);
+        return Expression.createExpression(Type.BOOLEAN, result);
+    }
 
-	public Expression applyLT(Expression rightOperand) throws Exception {
-		throw new Exception("Operation LT is not permitted for type " + this.getType() + ".");
-	}
+    public Expression applyQUES(Expression trueOperand, Expression falseOperand) throws Exception {
+        if (trueOperand.type != falseOperand.type) {
+            throw new Exception("Both right operands of ternary equation should have same type");
+        }
+        
+        if (trueOperand.isFormal || falseOperand.isFormal)
+            return Expression.createParameter(trueOperand.type);
+        
+        return Expression.createExpression(trueOperand.type, (Boolean) value ? trueOperand.value : falseOperand.value);
+    }
 
-	public Expression applyLE(Expression rightOperand) throws Exception {
-		throw new Exception("Operation LE is not permitted for type " + this.getType() + ".");
-	}
-
-	public Expression applyGT(Expression rightOperand) throws Exception {
-		throw new Exception("Operation GT is not permitted for type " + this.getType() + ".");
-	}
-
-	public Expression applyGE(Expression rightOperand) throws Exception {
-		throw new Exception("Operation GE is not permitted for type " + this.getType() + ".");
-	}
-
-	public Expression applyPLUS(Expression rightOperand) throws Exception {
-		throw new Exception("Operation PLUS is not permitted for type " + this.getType() + ".");
-	}
-
-	public Expression applyMINUS(Expression rightOperand) throws Exception {
-		throw new Exception("Operation MINUS is not permitted for type " + this.getType() + ".");
-	}
-
-	public Expression applyTIMES(Expression rightOperand) throws Exception {
-		throw new Exception("Operation TIMES is not permitted for type " + this.getType() + ".");
-	}
-
-	public Expression applyDIV(Expression rightOperand) throws Exception {
-		throw new Exception("Operation DIV is not permitted for type " + this.getType() + ".");
-	}
-
-	public Expression applyMOD(Expression rightOperand) throws Exception {
-		throw new Exception("Operation MOD is not permitted for type " + this.getType() + ".");
-	}
-
-	public Expression applyQUES(Expression trueOperand, Expression falseOperand) throws Exception {
-		throw new Exception("The condition for a ternary expression should be a boolean.");
-	}
-	public Expression applyEXCL(Expression operand) throws Exception {
-		throw new Exception("Operation EXCL is not permitted for type " + this.getType() + ".");
-	}
+    public Expression applyEXCL() throws Exception {
+        return isFormal ? Expression.createParameter(type) : Expression.createExpression(type, !((Boolean) value));
+    }
 }
