@@ -7,8 +7,18 @@ import java_cup.runtime.*;
 
 parser code {:
     public static Scanner scanner = null;
+
+    private boolean inMain = false;
     private Type returnType = null;
     
+    public boolean isInMain() {
+        return inMain;
+    }
+
+    public void setInMain(boolean inMain) {
+        this.inMain = inMain;
+    }
+
     public Type getReturnType() {
         return returnType;
     }
@@ -62,7 +72,7 @@ terminal String IDENT;
  * GRAMMAR SYMBOLS
  *******************************************************************************/
 
-non terminal program, parser_init, func_list, func_proto;
+non terminal program, parser_init, func_list, func_proto, main;
 non terminal block, block_init, instr_list, instruction;
 
 non terminal Type declaration, func_type, type;
@@ -91,7 +101,7 @@ precedence left ELSE; /* necessary to fix shift/reduce conflict on if-else state
  * GRAMMAR RULES
  *******************************************************************************/
 
-program     ::= parser_init func_list MAIN block
+program     ::= parser_init func_list main block
                 {:
                     System.out.println("Syntax analysis: OK");
                     System.out.println("Type checking:   OK");
@@ -159,7 +169,7 @@ func_type   ::= type:t
 type_list   ::= block_init type:t IDENT:i
                 {:
                     try {
-                        SymbolTable.getInstance().declareSymbol(i, t);
+                        SymbolTable.getInstance().declareSymbol(i, Expression.createExpression(t, null));
                     } catch (Exception e) {
                         System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
                         System.exit(-1);
@@ -171,7 +181,7 @@ type_list   ::= block_init type:t IDENT:i
             |   type_list:l COMA type:t IDENT:i
                 {:
                     try {
-                        SymbolTable.getInstance().declareSymbol(i, t);
+                        SymbolTable.getInstance().declareSymbol(i, Expression.createExpression(t, null));
                     } catch (Exception e) {
                         System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
                         System.exit(-1);
@@ -183,6 +193,12 @@ type_list   ::= block_init type:t IDENT:i
             ;
 
 /* ### code definition section ### */
+
+main        ::= MAIN
+                {:
+                    parser.setInMain(true);
+                :}
+            ;
 
 block       ::= block_init LBRACK instr_list RBRACK
                 {:
@@ -513,15 +529,19 @@ expression  ::= IDENT:i init_opt:e
                 :} %prec EXCL
             |   expression:c QUES expression:ei COLON expression:ee
                 {:
-                    if (c != Type.BOOLEAN) {
-                        System.out.println("ERROR: condition of ternary equation should be a boolean expression (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                    if (parser.isInMain()) {
+
+                    }else {
+                        if (c != Type.BOOLEAN) {
+                            System.out.println("ERROR: condition of ternary equation should be a boolean expression (line " + Parser.scanner.getLine() + ")");
+                            System.exit(-1);
+                        }
+                        if (ei != ee) {
+                            System.out.println("ERROR: Type mismatch on ternary equation (line " + Parser.scanner.getLine() + ")");
+                            System.exit(-1);
+                        }
+                        RESULT = ei;
                     }
-                    if (ei != ee) {
-                        System.out.println("ERROR: Type mismatch on ternary equation (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
-                    }
-                    RESULT = ei;
                 :}
             |   TRUE
                 {:

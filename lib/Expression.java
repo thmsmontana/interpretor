@@ -1,10 +1,35 @@
 public class Expression {
-	protected Object value;
 	protected Type type;
+	protected Object value;
+	protected boolean isFormal;
 
-	public Expression(Type type, Object value) {
-		this.value = value;
+	protected Expression(Type type, Object value) {
+		this(type, value, false);
+	}
+
+	protected Expression(Type type, Object value, boolean isFormal) {
 		this.type = type;
+		this.value = value;
+		this.isFormal = isFormal;
+	}
+
+	public static Expression createParameter(Type type) {
+		return createExpression(type, null, true);
+	}
+
+	public static Expression createExpression(Type type, Object value, boolean isFormal) {
+		switch (type) {
+			case Type.BOOLEAN:
+				return new BooleanExpression(type, value, isFormal);
+			case Type.INTEGER:
+				return new IntegerExpression(type, value, isFormal);
+			case Type.FLOAT:
+				return new FloatExpression(type, value, isFormal);
+			case Type.STRING:
+				return new StringExpression(type, value, isFormal);
+			default:
+				return new Expression(type, null, isFormal);
+		}
 	}
 
 	public Object getValue() {
@@ -19,9 +44,14 @@ public class Expression {
 
 	/* Defining operations */
 	public Expression applyEQUAL(Expression rightOperand) throws Exception {
-		if (this.getType() == rightOperand.getType()) {
+		if (this.getType() != rightOperand.getType()) {
+			throw new Exception("Could not cast " + rightOperand.getType() + " into " this.getType() + ".");
+		}
+		
+		if (!this.isFormal && !rightOperand.isFormal) {
 			this.value = rightOperand.getValue();
-		} else throw new Exception("Could not cast " + rightOperand.getType() + " into " this.getType() + ".");
+		}
+		return new Expression(type, value, isFormal);
 	}
 
 	public Expression applyOR(Expression rightOperand) throws Exception {
