@@ -75,9 +75,9 @@ terminal String IDENT;
 non terminal program, parser_init, func_list, func_proto, main;
 non terminal block, block_init, instr_list, instruction;
 
-non terminal Type declaration, func_type, type;
-non terminal Type init_opt, expr_opt, expression;
-non terminal List<Type> type_list, param_list;
+non terminal Expression declaration, func_type, type;
+non terminal Expression init_opt, expr_opt, expression;
+non terminal List<Expression> type_list, param_list;
 
 
 /*******************************************************************************
