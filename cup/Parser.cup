@@ -112,7 +112,6 @@ program     ::= parser_init func_list main block
 parser_init ::= /* empty */
                 {:
                     SymbolTable.getInstance();
-                    TypeChecker.getInstance();
                 :}
             ;
 
@@ -169,26 +168,27 @@ func_type   ::= type:t
 type_list   ::= block_init type:t IDENT:i
                 {:
                     try {
-                        SymbolTable.getInstance().declareSymbol(i, Expression.createExpression(t, null));
+                        Expression expr = Expression.createParameter(t);
+                        SymbolTable.getInstance().declareSymbol(i, expr);                    
+                        RESULT = new ArrayList<Expression>();
+                        RESULT.add(expr);
                     } catch (Exception e) {
                         System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
                         System.exit(-1);
                     }
-                    
-                    RESULT = new ArrayList<Type>();
-                    RESULT.add(t);
+
                 :}
             |   type_list:l COMA type:t IDENT:i
                 {:
                     try {
-                        SymbolTable.getInstance().declareSymbol(i, Expression.createExpression(t, null));
+                        Expression expr = Expression.createParameter(t);
+                        SymbolTable.getInstance().declareSymbol(i, expr);  
+                        RESULT = l;
+                        RESULT.add(t);
                     } catch (Exception e) {
                         System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
                         System.exit(-1);
                     }
-                    
-                    RESULT = l;
-                    RESULT.add(t);
                 :}
             ;
 
@@ -221,7 +221,7 @@ instruction ::= block
             |   expr_opt SEMI
             |   PRINT expression:e SEMI
                 {:
-                    System.out.println("Line " + Parser.scanner.getLine() + ": expression type is " + e);
+                    System.out.println(e);
                 :}
             |   RETURN expr_opt:e SEMI
                 {:
@@ -263,41 +263,26 @@ instruction ::= block
 declaration ::= type:t IDENT:i init_opt:e
                 {:
                     try {
-                        SymbolTable.getInstance().declareSymbol(i, t);
+                        Expression expr =  Expression.createExpression(t, null);
+                        expr.applyEQUAL(e);
+                        SymbolTable.getInstance().declareSymbol(i,);
                     } catch (Exception ex) {
                         System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
                         System.exit(-1);
                     }
 
-                    if (e != null) {
-                        try {
-                            TypeChecker tc = TypeChecker.getInstance();
-                            tc.checkOperation("=", t, e);
-                        } catch (Exception ex) {
-                            System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                            System.exit(-1);
-                        }
-                    }
                     RESULT = t;
                 :}
             |   declaration:t COMA IDENT:i init_opt:e
                 {:
                     try {
-                        SymbolTable.getInstance().declareSymbol(i, t);
+                        Expression expr =  Expression.createExpression(t, null);
+                        expr.applyEQUAL(e);
                     } catch (Exception ex) {
                         System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
                         System.exit(-1);
                     }
                     
-                    if (e != null) {
-                        try {
-                            TypeChecker tc = TypeChecker.getInstance();
-                            tc.checkOperation("=", t, e);
-                        } catch (Exception ex) {
-                            System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                            System.exit(-1);
-                        }
-                    }
                     RESULT = t;
                 :}
             ;
@@ -350,36 +335,7 @@ expression  ::= IDENT:i init_opt:e
                         System.exit(-1);
                     }
                     
-                    if (e != null) {
-                        try {
-                            TypeChecker tc = TypeChecker.getInstance();
-                            tc.checkOperation("=", t, e);
-                        } catch (Exception ex) {
-                            System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                            System.exit(-1);
-                        }
-                    }
                     RESULT = t;
-                :}
-            |   IDENT:i LPAR RPAR
-                {:
-                    try {
-                        Function f = SymbolTable.getInstance().getFunction(i);
-                        RESULT = f.checkParamTypes(new ArrayList<Type>());
-                    } catch (Exception e) {
-                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
-                    }
-                :}
-            |   IDENT:i LPAR param_list:l RPAR
-                {:
-                    try {
-                        Function f = SymbolTable.getInstance().getFunction(i);
-                        RESULT = f.checkParamTypes(l);
-                    } catch (Exception e) {
-                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
-                    }
                 :}
             |   LPAR expression:e RPAR
                 {:
@@ -387,160 +343,145 @@ expression  ::= IDENT:i init_opt:e
                 :}
             |   EXCL expression:e
                 {:
-                    if (e != Type.BOOLEAN) {
-                        System.out.println("ERROR: '!' operator can only operate on booleans (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                    try {
+                        RESULT = e.applyEXCL();
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
-                    RESULT = Type.BOOLEAN;
                 :}
             |   expression:e1 OR expression:e2
                 {:
-                    if (e1 != Type.BOOLEAN || e2 != Type.BOOLEAN) {
-                        System.out.println("ERROR: '||' operator can only operate on booleans (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                    try {
+                        RESULT = e1.applyOR(e2);
+                    } catch (Exception e) {
+                        System.exit(-1);    
                     }
-                    RESULT = Type.BOOLEAN;
                 :}
             |   expression:e1 AND expression:e2
                 {:
-                    if (e1 != Type.BOOLEAN || e2 != Type.BOOLEAN) {
-                        System.out.println("ERROR: '||' operator can only operate on booleans (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                    try {
+                        RESULT = e1.applyAND(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
-                    RESULT = Type.BOOLEAN;
                 :}
             |   expression:e1 EQ expression:e2
                 {:
                     try {
-                        TypeChecker tc = TypeChecker.getInstance();
-                        RESULT = tc.checkOperation(TypeChecker.EQU_COMPARATOR, e1, e2);
-                    } catch (Exception ex) {
-                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                        RESULT = e1.applyEQ(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   expression:e1 NE expression:e2
                 {:
                     try {
-                        TypeChecker tc = TypeChecker.getInstance();
-                        RESULT = tc.checkOperation(TypeChecker.EQU_COMPARATOR, e1, e2);
-                    } catch (Exception ex) {
-                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                        RESULT = e1.applyNE(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   expression:e1 LT expression:e2
                 {:
                     try {
-                        TypeChecker tc = TypeChecker.getInstance();
-                        RESULT = tc.checkOperation(TypeChecker.ORDER_COMPARATOR, e1, e2);
-                    } catch (Exception ex) {
-                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                        RESULT = e1.applyLT(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   expression:e1 LE expression:e2
                 {:
                     try {
-                        TypeChecker tc = TypeChecker.getInstance();
-                        RESULT = tc.checkOperation(TypeChecker.ORDER_COMPARATOR, e1, e2);
-                    } catch (Exception ex) {
-                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                        RESULT = e1.applyLE(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   expression:e1 GT expression:e2
                 {:
                     try {
-                        TypeChecker tc = TypeChecker.getInstance();
-                        RESULT = tc.checkOperation(TypeChecker.ORDER_COMPARATOR, e1, e2);
-                    } catch (Exception ex) {
-                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                        RESULT = e1.applyGT(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   expression:e1 GE expression:e2
                 {:
                     try {
-                        TypeChecker tc = TypeChecker.getInstance();
-                        RESULT = tc.checkOperation(TypeChecker.ORDER_COMPARATOR, e1, e2);
-                    } catch (Exception ex) {
-                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                        RESULT = e1.applyGE(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   expression:e1 PLUS expression:e2
                 {:
                     try {
-                        TypeChecker tc = TypeChecker.getInstance();
-                        RESULT = tc.checkOperation("+", e1, e2);
-                    } catch (Exception ex) {
-                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                        RESULT = e1.applyPLUS(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   expression:e1 MINUS expression:e2
                 {:
                     try {
-                        TypeChecker tc = TypeChecker.getInstance();
-                        RESULT = tc.checkOperation(TypeChecker.CALC_OPERATOR, e1, e2);
-                    } catch (Exception ex) {
-                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                        RESULT = e1.applyMINUS(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   expression:e1 TIMES expression:e2
                 {:
                     try {
-                        TypeChecker tc = TypeChecker.getInstance();
-                        RESULT = tc.checkOperation(TypeChecker.CALC_OPERATOR, e1, e2);
-                    } catch (Exception ex) {
-                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                        RESULT = e1.applyTIMES(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   expression:e1 DIV expression:e2
                 {:
                     try {
-                        TypeChecker tc = TypeChecker.getInstance();
-                        RESULT = tc.checkOperation(TypeChecker.CALC_OPERATOR, e1, e2);
-                    } catch (Exception ex) {
-                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                        RESULT = e1.applyDIV(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   expression:e1 MOD expression:e2
                 {:
                     try {
-                        TypeChecker tc = TypeChecker.getInstance();
-                        RESULT = tc.checkOperation(TypeChecker.CALC_OPERATOR, e1, e2);
-                    } catch (Exception ex) {
-                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                        RESULT = e1.applyMOD(e2);
+                    } catch (Exception e) {
+                        System.out.println("ERROR: " + e.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   MINUS expression:e
                 {:
-                    if (e != Type.INTEGER && e != Type.FLOAT) {
-                        System.out.println("ERROR: Unary '-' operator can only operate on int and float (line " + Parser.scanner.getLine() + ")");
-                        System.exit(-1);
+                    try {
+                        RESULT = e1.applyMINUS();
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
-                    RESULT = e;
                 :} %prec EXCL
             |   expression:c QUES expression:ei COLON expression:ee
                 {:
-                    if (parser.isInMain()) {
-
-                    }else {
-                        if (c != Type.BOOLEAN) {
-                            System.out.println("ERROR: condition of ternary equation should be a boolean expression (line " + Parser.scanner.getLine() + ")");
-                            System.exit(-1);
-                        }
-                        if (ei != ee) {
-                            System.out.println("ERROR: Type mismatch on ternary equation (line " + Parser.scanner.getLine() + ")");
-                            System.exit(-1);
-                        }
-                        RESULT = ei;
+                    try {
+                        RESULT = e1.applyQUES(ei, ee);
+                    } catch (Exception ex) {
+                        System.out.println("ERROR: " + ex.getMessage() + " (line " + Parser.scanner.getLine() + ")");
+                        System.exit(-1);    
                     }
                 :}
             |   TRUE

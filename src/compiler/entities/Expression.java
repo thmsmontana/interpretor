@@ -124,4 +124,12 @@ public class Expression {
 	public Expression applyMINUS() throws Exception {
 		throw new Exception("Unary '-' operator can only operate on int and float.");
 	}
+
+
+
+
+
+	public String toString() {
+		return "(" + this.getType() + ") " + this.getValue();
+	}
 }}
